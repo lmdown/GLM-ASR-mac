@@ -1,5 +1,7 @@
 # GLM-ASR
 
+[Readme in English](README.md)
+
 <div align="center">
 <img src=resources/logo.svg width="20%"/>
 </div>

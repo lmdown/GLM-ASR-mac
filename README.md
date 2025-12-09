@@ -1,15 +1,12 @@
 # GLM-ASR
 
-<div align="center">
-<img src="resources/logo.svg" width="20%"/>
-</div>
+[中文阅读.](./README_zh.md)
 
+<div align="center">
+<img src=resources/logo.svg width="20%"/>
+</div>
 <p align="center">
-    👋 Join our <a href="#" target="_blank">Discord</a> community.
-    <br>
-    🚀 Experience the demo on <a href="#" target="_blank">Hugging Face Spaces</a>.
-    <br>
-    📦 Download model weights on <a href="#" target="_blank">Hugging Face</a> or <a href="#" target="_blank">ModelScope</a>.
+    👋 Join our <a href="resources/WECHAT.md" target="_blank">WeChat</a> community
 </p>
 
 ## Model Introduction
