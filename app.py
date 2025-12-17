@@ -415,4 +415,8 @@ with gr.Blocks(title=_('title')) as demo:
 
 # 启动界面
 if __name__ == "__main__":
-    demo.launch(share=False, server_name="0.0.0.0", server_port=7860)
+    demo.launch(
+        share=False, 
+        # server_name="0.0.0.0", 
+        # server_port=7860
+    )
