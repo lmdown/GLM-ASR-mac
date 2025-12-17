@@ -1,3 +1,4 @@
+from tkinter import Scrollbar
 import gradio as gr
 import torch
 from pathlib import Path
@@ -57,7 +58,9 @@ translations = {
         'model_not_loaded': '模型未加载，请先加载模型',
         'transcribe_fail': '转录失败: {error}',
         'empty_transcript': '[空转录结果]',
-        'audio_empty': '音频内容为空或加载失败。'
+        'audio_empty': '音频内容为空或加载失败。',
+        'copy_btn': '复制',
+        'download_btn': '下载'
     },
     'en': {
         'title': 'GLM-ASR Speech Recognition',
@@ -80,7 +83,9 @@ translations = {
         'model_not_loaded': 'Model not loaded, please load model first',
         'transcribe_fail': 'Transcription failed: {error}',
         'empty_transcript': '[Empty transcript result]',
-        'audio_empty': 'Audio content is empty or failed to load.'
+        'audio_empty': 'Audio content is empty or failed to load.',
+        'copy_btn': 'Copy',
+        'download_btn': 'Download'
     }
 }
 
@@ -382,8 +387,16 @@ def transcribe_audio(audio_path, device, max_new_tokens):
     
     return load_status, transcript, srt_content, json_content
 
+css = """
+#transcript-output textarea,
+#srt-output textarea,
+#json-output textarea {
+    overflow-y: auto !important;
+}
+"""
+
 # 创建Gradio界面
-with gr.Blocks(title=_('title')) as demo:
+with gr.Blocks(title=_('title'), css=css) as demo:
     gr.Markdown(f"# {_('title')}")
     gr.Markdown(_('description'))
     
@@ -423,26 +436,44 @@ with gr.Blocks(title=_('title')) as demo:
                 with gr.TabItem(_('transcript_label')):
                     transcript_output = gr.Textbox(
                         label=_('transcript_label'),
-                        interactive=False,
                         placeholder=_('transcript_placeholder'),
-                        lines=10
+                        lines=10,
+                        max_lines=20,
+                        elem_id="transcript-output",
+                        autoscroll=True,
+                        interactive=False
                     )
+                    with gr.Row():
+                        transcript_copy_btn = gr.Button(_('copy_btn'), variant="secondary", size="sm")
+                        transcript_download_btn = gr.Button(_('download_btn'), variant="secondary", size="sm")
                 
                 with gr.TabItem(_('srt_label')):
                     srt_output = gr.Textbox(
                         label=_('srt_label'),
-                        interactive=False,
                         placeholder=_('srt_placeholder'),
-                        lines=10
+                        lines=10,
+                        max_lines=20,
+                        autoscroll=True,
+                        elem_id="srt-output",
+                        interactive=False
                     )
+                    with gr.Row():
+                        srt_copy_btn = gr.Button(_('copy_btn'), variant="secondary", size="sm")
+                        srt_download_btn = gr.Button(_('download_btn'), variant="secondary", size="sm")
                 
                 with gr.TabItem(_('json_label')):
                     json_output = gr.Textbox(
                         label=_('json_label'),
-                        interactive=False,
                         placeholder=_('json_placeholder'),
-                        lines=10
+                        lines=10,
+                        max_lines=20,
+                        elem_id="json-output",
+                        autoscroll=True,
+                        interactive=False
                     )
+                    with gr.Row():
+                        json_copy_btn = gr.Button(_('copy_btn'), variant="secondary", size="sm")
+                        json_download_btn = gr.Button(_('download_btn'), variant="secondary", size="sm")
     
     # 示例音频
     gr.Examples(
@@ -461,6 +492,56 @@ with gr.Blocks(title=_('title')) as demo:
         fn=transcribe_audio,
         inputs=[audio_input, device_dropdown, max_new_tokens_slider],
         outputs=[load_status, transcript_output, srt_output, json_output]
+    )
+    
+    # 复制按钮功能
+    transcript_copy_btn.click(
+        fn=lambda x: x,  # 只是传递内容以便复制
+        inputs=[transcript_output],
+        outputs=[transcript_output],
+        postprocess=False,  # 防止额外处理
+        js="(x) => {navigator.clipboard.writeText(x); return x;}"  # 使用JavaScript复制到剪贴板
+    )
+    
+    srt_copy_btn.click(
+        fn=lambda x: x,
+        inputs=[srt_output],
+        outputs=[srt_output],
+        postprocess=False,
+        js="(x) => {navigator.clipboard.writeText(x); return x;}"
+    )
+    
+    json_copy_btn.click(
+        fn=lambda x: x,
+        inputs=[json_output],
+        outputs=[json_output],
+        postprocess=False,
+        js="(x) => {navigator.clipboard.writeText(x); return x;}"
+    )
+    
+    # 下载按钮功能（使用JavaScript直接下载，不创建额外组件）
+    transcript_download_btn.click(
+        fn=lambda x: x,
+        inputs=[transcript_output],
+        outputs=[transcript_output],
+        postprocess=False,
+        js="(text) => { const blob = new Blob([text], {type: 'text/plain'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'transcript.txt'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); return text;}"
+    )
+    
+    srt_download_btn.click(
+        fn=lambda x: x,
+        inputs=[srt_output],
+        outputs=[srt_output],
+        postprocess=False,
+        js="(text) => { const blob = new Blob([text], {type: 'text/plain'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'transcript.srt'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); return text;}"
+    )
+    
+    json_download_btn.click(
+        fn=lambda x: x,
+        inputs=[json_output],
+        outputs=[json_output],
+        postprocess=False,
+        js="(text) => { const blob = new Blob([text], {type: 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'transcript.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); return text;}"
     )
 
 # 启动界面
