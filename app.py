@@ -2,6 +2,9 @@ import gradio as gr
 import torch
 from pathlib import Path
 import torchaudio
+# 设置使用legacy后端
+torchaudio.set_audio_backend("soundfile")
+import ffmpeg
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -13,6 +16,7 @@ import os
 import locale
 import json
 import datetime
+import traceback
 
 # 检测系统语言
 def get_system_language():
@@ -22,7 +26,9 @@ def get_system_language():
             return 'zh'
         else:
             return 'en'
-    except:
+    except Exception as e:
+        print("系统语言检测错误：")
+        traceback.print_exc()
         return 'en'
 
 # 设置默认语言
@@ -114,6 +120,31 @@ def get_audio_token_length(seconds, merge_factor=2):
     audio_token_num = min(audio_token_num, 1500 // merge_factor)
     return audio_token_num
 
+# 音频格式转换函数
+def convert_audio_to_wav(audio_path):
+    audio_path = Path(audio_path)
+    if audio_path.suffix.lower() == '.wav':
+        return str(audio_path)
+    
+    # 创建临时wav文件
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+        tmp_wav_path = tmp.name
+    
+    try:
+        # 使用ffmpeg转换格式
+        (ffmpeg
+         .input(str(audio_path))
+         .output(tmp_wav_path, acodec='pcm_s16le', ac=1, ar=16000)
+         .overwrite_output()
+         .run(capture_stdout=True, capture_stderr=True)
+        )
+        return tmp_wav_path
+    except Exception as e:
+        print(f"音频格式转换错误: {e}")
+        traceback.print_exc()
+        os.unlink(tmp_wav_path)  # 清理临时文件
+        raise
+
 def build_prompt(
     audio_path: Path,
     tokenizer,
@@ -122,7 +153,11 @@ def build_prompt(
     chunk_seconds: int = 30,
 ) -> tuple[dict, list]:
     audio_path = Path(audio_path)
-    wav, sr = torchaudio.load(str(audio_path))
+    
+    # 转换音频格式为wav
+    converted_wav_path = convert_audio_to_wav(audio_path)
+    
+    wav, sr = torchaudio.load(converted_wav_path)
     wav = wav[:1, :]
     if sr != feature_extractor.sampling_rate:
         wav = torchaudio.transforms.Resample(sr, feature_extractor.sampling_rate)(wav)
@@ -162,6 +197,8 @@ def build_prompt(
         audio_length.append(num_tokens)
 
     if not audios:
+        print("音频内容为空或加载失败：")
+        traceback.print_exc()
         raise ValueError(_('audio_empty'))
 
     tokens += tokenizer.encode("<|user|>")
@@ -177,6 +214,15 @@ def build_prompt(
         "audio_length": [audio_length],
         "attention_mask": torch.ones(1, len(tokens), dtype=torch.long),
     }
+    
+    # 清理临时文件
+    if converted_wav_path != str(audio_path):
+        try:
+            os.unlink(converted_wav_path)
+        except Exception as e:
+            print(f"清理临时文件错误: {e}")
+            traceback.print_exc()
+    
     return batch, chunk_timestamps
 
 def prepare_inputs(batch: dict, device: torch.device) -> tuple[dict, int]:
@@ -259,6 +305,8 @@ class GLMASRModel:
             
             return _('model_load_success')
         except Exception as e:
+            print("模型加载错误：")
+            traceback.print_exc()
             return _('model_load_fail', error=str(e))
     
     def transcribe(self, audio_path, max_new_tokens=128):
@@ -312,6 +360,8 @@ class GLMASRModel:
             
             return transcript or _('empty_transcript'), transcript_segments, srt_content, json_content
         except Exception as e:
+            print("转录错误：")
+            traceback.print_exc()
             return _('transcribe_fail', error=str(e)), [], "", ""
 
 # 初始化模型实例
